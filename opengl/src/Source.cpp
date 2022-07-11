@@ -27,6 +27,13 @@ std::string ReadFile(std::string path)
     return buffer.str();
 }
 
+
+extern "C"
+{
+    _declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+    _declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 int main(void)
 {
 
@@ -52,51 +59,89 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
-
+    
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
     else
+    {
         std::cout << glGetString(GL_VERSION) << '\n';
+        std::cout << glGetString(GL_VENDOR) << '\n';
+    }
     
     glViewport(0, 0, 800, 600);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     glfwSetKeyCallback(window, keyCallback);
+    
+    unsigned int VS = glCreateShader(GL_VERTEX_SHADER);
+    std::string vertexsrc = ReadFile("Shaders/VertexShader.glsl");
+    const char* vsrc = vertexsrc.c_str();
+    glShaderSource(VS, 1, &vsrc, NULL);
+    glCompileShader(VS);
+
+    unsigned int FS = glCreateShader(GL_FRAGMENT_SHADER);
+    std::string fragmentsrc = ReadFile("Shaders/FragmentShader.glsl");
+    const char* fsrc = fragmentsrc.c_str();
+    glShaderSource(FS, 1, &fsrc, nullptr);
+    glCompileShader(FS);
+
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, VS);
+    glAttachShader(shaderProgram, FS);
+
+    glLinkProgram(shaderProgram);
+
+    glDeleteShader(VS);
+    glDeleteShader(FS);
+
+
     float vertices[] =
     {
         -0.5f, -0.5f,
-         0.0f,  0.5f,
+        -0.5f,  0.5f,
+         0.5f,  0.5f,
          0.5f, -0.5f
     };
 
+    unsigned int indices[] =
+    {
+        0, 1, 2,
+        2, 3, 0
+    };
 
-    unsigned int VBO;
+    unsigned int VBO, VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (const void*)0);
-
-
-
-
-
+    glEnableVertexAttribArray(0);
+    
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
    
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
-        /* Render here */
+        glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
+        // Clean the back buffer and assign the new color to it
         glClear(GL_COLOR_BUFFER_BIT);
-
-        glClearColor(0.3f, 0.17f, 0.21f, 1.0f);
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);`
-        glClearColor(0.12f, 0.17f, 0.27f, 1.0f);
+        // Tell OpenGL which Shader Program we want to use
+        glUseProgram(shaderProgram);
+        // Bind the VAO so OpenGL knows to use it
+        glBindVertexArray(VAO);
+        // Draw the triangle using the GL_TRIANGLES primitive
+       glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, &indices);
+        // Swap the back buffer with the front buffer
+        glfwSwapBuffers(window);
         /* Poll for and process events */
         glfwPollEvents();
     }
